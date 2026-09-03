@@ -7,6 +7,18 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// Safety Body Parser for Vercel Serverless
+app.use((req, res, next) => {
+    if (typeof req.body === 'string') {
+        try {
+            req.body = JSON.parse(req.body);
+        } catch (e) {
+            console.log("Body parse error:", e.message);
+        }
+    }
+    next();
+});
+
 // Serve Admin Panel Static Folder
 app.use(express.static(path.join(__dirname, 'publicm')));
 
@@ -50,70 +62,96 @@ function requireAdminAuth(req, res, next) {
 
 // 1. REGISTER USER (1 Device = 1 Account)
 app.post('/api/auth/register', async (req, res) => {
-    const { username, password, device_id } = req.body || {};
-    if (!username || !password || !device_id) return res.status(400).json({ error: "Required fields missing" });
+    try {
+        const body = req.body || {};
+        const username = body.username ? String(body.username).trim() : '';
+        const password = body.password ? String(body.password).trim() : '';
+        const device_id = body.device_id ? String(body.device_id).trim() : '';
 
-    const db = await readDB();
-    if (db.users[username]) return res.status(400).json({ error: "Username already exists." });
+        if (!username || !password || !device_id) {
+            return res.status(400).json({ error: "Required fields missing" });
+        }
 
-    // Check 1 Account Per Device
-    const existingDeviceUser = Object.values(db.users).find(u => u.device_id === device_id);
-    if (existingDeviceUser) {
-        return res.status(400).json({ error: `Only 1 account allowed per device! Registered to: ${existingDeviceUser.username}` });
+        const db = await readDB();
+        if (db.users[username]) {
+            return res.status(400).json({ error: "Username already exists." });
+        }
+
+        // Check 1 Account Per Device
+        const existingDeviceUser = Object.values(db.users).find(u => u.device_id === device_id);
+        if (existingDeviceUser) {
+            return res.status(400).json({ error: `Only 1 account allowed per device! Registered to: ${existingDeviceUser.username}` });
+        }
+
+        const newUser = {
+            username, password, device_id,
+            credits: 2, plan: "Trial", is_pro: false,
+            account_status: "Active", created_at: new Date().toISOString()
+        };
+        db.users[username] = newUser;
+        await writeDB(db);
+        
+        const { password: _, ...userSafeData } = newUser;
+        return res.json(userSafeData);
+    } catch (e) {
+        return res.status(500).json({ error: e.message || "Registration failed" });
     }
-
-    const newUser = {
-        username, password, device_id,
-        credits: 2, plan: "Trial", is_pro: false,
-        account_status: "Active", created_at: new Date().toISOString()
-    };
-    db.users[username] = newUser;
-    await writeDB(db);
-    
-    const { password: _, ...userSafeData } = newUser;
-    return res.json(userSafeData);
 });
 
 // 2. LOGIN USER (Permanent Device Lock)
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password, device_id } = req.body || {};
-    if (!username || !password || !device_id) return res.status(400).json({ error: "Required fields missing" });
+    try {
+        const body = req.body || {};
+        const username = body.username ? String(body.username).trim() : '';
+        const password = body.password ? String(body.password).trim() : '';
+        const device_id = body.device_id ? String(body.device_id).trim() : '';
 
-    const db = await readDB();
-    const user = db.users[username];
+        if (!username || !password || !device_id) {
+            return res.status(400).json({ error: "Required fields missing" });
+        }
 
-    if (!user) return res.status(404).json({ error: "User not found" });
-    if (user.password !== password) return res.status(401).json({ error: "Incorrect password" });
-    if (user.account_status === "Blocked") return res.status(403).json({ error: "Account is Blocked by Admin." });
+        const db = await readDB();
+        const user = db.users[username];
 
-    // Bind permanently to first logging phone
-    if (!user.device_id || user.device_id === "") {
-        user.device_id = device_id;
-        await writeDB(db);
-    } else if (user.device_id !== device_id) {
-        return res.status(403).json({ error: "Device Locked! Account belongs to another phone." });
+        if (!user) return res.status(404).json({ error: "User not found" });
+        if (user.password !== password) return res.status(401).json({ error: "Incorrect password" });
+        if (user.account_status === "Blocked") return res.status(403).json({ error: "Account is Blocked by Admin." });
+
+        // Bind permanently to first logging phone
+        if (!user.device_id || user.device_id === "") {
+            user.device_id = device_id;
+            await writeDB(db);
+        } else if (user.device_id !== device_id) {
+            return res.status(403).json({ error: "Device Locked! Account belongs to another phone." });
+        }
+
+        const { password: _, ...userSafeData } = user;
+        return res.json(userSafeData);
+    } catch (e) {
+        return res.status(500).json({ error: e.message || "Login failed" });
     }
-
-    const { password: _, ...userSafeData } = user;
-    return res.json(userSafeData);
 });
 
 // 3. DEDUCT CREDIT
 app.post('/api/deduct', async (req, res) => {
-    const { username } = req.body || {};
-    const db = await readDB();
-    const user = db.users[username];
+    try {
+        const { username } = req.body || {};
+        const db = await readDB();
+        const user = db.users[username];
 
-    if (!user) return res.status(404).json({ error: "User not found" });
-    if (user.account_status === "Blocked") return res.status(403).json({ error: "Blocked." });
-    if (user.is_pro) return res.json({ success: true, credits: user.credits, message: "PRO User" });
+        if (!user) return res.status(404).json({ error: "User not found" });
+        if (user.account_status === "Blocked") return res.status(403).json({ error: "Blocked." });
+        if (user.is_pro) return res.json({ success: true, credits: user.credits, message: "PRO User" });
 
-    if (user.credits > 0) {
-        user.credits -= 1;
-        await writeDB(db);
-        return res.json({ success: true, credits: user.credits });
-    } else {
-        return res.status(400).json({ error: "0 Credits." });
+        if (user.credits > 0) {
+            user.credits -= 1;
+            await writeDB(db);
+            return res.json({ success: true, credits: user.credits });
+        } else {
+            return res.status(400).json({ error: "0 Credits." });
+        }
+    } catch (e) {
+        return res.status(500).json({ error: e.message || "Deduct failed" });
     }
 });
 
@@ -177,5 +215,4 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 }
 
-// CRITICAL FOR VERCEL:
 module.exports = app;
