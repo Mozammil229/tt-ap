@@ -7,6 +7,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// Handle CORS Preflight for Vercel
+app.options('*', cors());
+
 // Safety Body Parser for Vercel Serverless
 app.use((req, res, next) => {
     if (typeof req.body === 'string') {
@@ -49,6 +52,13 @@ async function writeDB(db) {
     }
 }
 
+function findUser(db, username) {
+    if (!username || !db || !db.users) return null;
+    const cleanName = String(username).trim().toLowerCase();
+    const key = Object.keys(db.users).find(k => k.toLowerCase() === cleanName);
+    return key ? db.users[key] : null;
+}
+
 const ADMIN_PASSWORD = "admin";
 
 function requireAdminAuth(req, res, next) {
@@ -73,7 +83,7 @@ app.post('/api/auth/register', async (req, res) => {
         }
 
         const db = await readDB();
-        if (db.users[username]) {
+        if (findUser(db, username)) {
             return res.status(400).json({ error: "Username already exists." });
         }
 
@@ -111,7 +121,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const db = await readDB();
-        const user = db.users[username];
+        const user = findUser(db, username);
 
         if (!user) return res.status(404).json({ error: "User not found" });
         if (user.password !== password) return res.status(401).json({ error: "Incorrect password" });
@@ -137,7 +147,7 @@ app.post('/api/deduct', async (req, res) => {
     try {
         const { username } = req.body || {};
         const db = await readDB();
-        const user = db.users[username];
+        const user = findUser(db, username);
 
         if (!user) return res.status(404).json({ error: "User not found" });
         if (user.account_status === "Blocked") return res.status(403).json({ error: "Blocked." });
@@ -166,11 +176,12 @@ app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
     if (!username || !password) return res.status(400).json({ error: "Username and password required" });
 
     const db = await readDB();
-    if (db.users[username]) return res.status(400).json({ error: "Username already exists" });
+    if (findUser(db, username)) return res.status(400).json({ error: "Username already exists" });
 
     const newUser = {
-        username, password,
-        device_id: device_id || "",
+        username: String(username).trim(),
+        password: String(password).trim(),
+        device_id: device_id ? String(device_id).trim() : "",
         credits: credits !== undefined ? Number(credits) : 2,
         plan: plan || "Trial",
         is_pro: String(is_pro) === "true",
@@ -178,7 +189,7 @@ app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
         created_at: new Date().toISOString()
     };
 
-    db.users[username] = newUser;
+    db.users[newUser.username] = newUser;
     await writeDB(db);
     res.json({ success: true, message: "User created successfully!", user: newUser });
 });
@@ -186,15 +197,15 @@ app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
 app.post('/api/admin/update', requireAdminAuth, async (req, res) => {
     const { username, password, credits, plan, is_pro, account_status, device_id } = req.body || {};
     const db = await readDB();
-    if (!db.users[username]) return res.status(404).json({ error: "User not found" });
+    const user = findUser(db, username);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    let user = db.users[username];
-    if (password) user.password = password;
+    if (password) user.password = String(password).trim();
     if (credits !== undefined) user.credits = Number(credits);
     if (plan !== undefined) user.plan = plan;
     if (is_pro !== undefined) user.is_pro = String(is_pro) === "true"; 
     if (account_status !== undefined) user.account_status = account_status;
-    if (device_id !== undefined) user.device_id = device_id;
+    if (device_id !== undefined) user.device_id = String(device_id).trim();
     
     await writeDB(db);
     res.json({ success: true });
@@ -203,11 +214,12 @@ app.post('/api/admin/update', requireAdminAuth, async (req, res) => {
 app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
     const { username } = req.body || {};
     const db = await readDB();
-    if (!db.users[username]) return res.status(404).json({ error: "User not found" });
+    const user = findUser(db, username);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    delete db.users[username];
+    delete db.users[user.username];
     await writeDB(db);
-    res.json({ success: true, message: `User ${username} deleted` });
+    res.json({ success: true, message: `User ${user.username} deleted` });
 });
 
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
