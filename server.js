@@ -18,15 +18,39 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 1. MONGODB CONNECTION (Aapka Diya Hua Link)
+// 1. MONGODB CONNECTION (Vercel Fix)
 // ==========================================
-// Note: Normally passwords environment variable mein rakhte hain, 
-// par aapki asani ke liye isay yahan hardcode kar diya hai.
 const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://pukathub_db_user:AWiAL8UUwrOQ6h33@cluster0.y2lzfvn.mongodb.net/MyUsersDB?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ Successfully Connected to MongoDB Cloud!"))
-    .catch((err) => console.log("❌ MongoDB Connection Error:", err.message));
+// Vercel cache connection fix
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectToDatabase() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+      console.log("✅ Successfully Connected to MongoDB!");
+      return mongoose;
+    }).catch(err => {
+      console.log("❌ MongoDB Connection Error:", err.message);
+      throw err;
+    });
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+
 
 // ==========================================
 // 2. USER DATABASE SCHEMA (Design)
@@ -41,15 +65,13 @@ const userSchema = new mongoose.Schema({
     account_status: { type: String, default: "Active" }
 }, { timestamps: { createdAt: 'created_at', updatedAt: false } });
 
-// Prevent schema overwrite issue in Vercel
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 
 // ==========================================
-// 3. API ROUTES (Mongoose ke sath)
+// 3. API ROUTES
 // ==========================================
 
-// Extract data from URL Query (GET) or JSON Body (POST)
 function getRequestData(req) {
     return { ...req.query, ...req.body };
 }
@@ -57,6 +79,7 @@ function getRequestData(req) {
 // REGISTER USER
 app.all('/api/auth/register', async (req, res) => {
     try {
+        await connectToDatabase(); // Ensure DB is connected before query
         const data = getRequestData(req);
         const username = data.username ? String(data.username).trim().toLowerCase() : '';
         const password = data.password ? String(data.password).trim() : '';
@@ -94,6 +117,7 @@ app.all('/api/auth/register', async (req, res) => {
 // LOGIN USER
 app.all('/api/auth/login', async (req, res) => {
     try {
+        await connectToDatabase();
         const data = getRequestData(req);
         const username = data.username ? String(data.username).trim().toLowerCase() : '';
         const password = data.password ? String(data.password).trim() : '';
@@ -127,6 +151,7 @@ app.all('/api/auth/login', async (req, res) => {
 // DEDUCT CREDIT
 app.all('/api/deduct', async (req, res) => {
     try {
+        await connectToDatabase();
         const data = getRequestData(req);
         const username = data.username ? String(data.username).trim().toLowerCase() : '';
         const user = await User.findOne({ username });
@@ -156,29 +181,39 @@ function requireAdminAuth(req, res, next) {
 }
 
 app.get('/api/admin/users', requireAdminAuth, async (req, res) => {
-    const users = await User.find({});
-    const userMap = {};
-    users.forEach(u => { userMap[u.username] = u; });
-    res.json(userMap);
+    try {
+        await connectToDatabase();
+        const users = await User.find({});
+        const userMap = {};
+        users.forEach(u => { userMap[u.username] = u; });
+        res.json(userMap);
+    } catch(e) {
+        res.status(500).json({error: e.message});
+    }
 });
 
 app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
-    const { username, password, credits, plan, is_pro, account_status, device_id } = req.body || {};
-    if (!username || !password) return res.status(400).json({ error: "Username and password required" });
-    
-    const cleanUsername = String(username).trim().toLowerCase();
-    const existingUser = await User.findOne({ username: cleanUsername });
-    if (existingUser) return res.status(400).json({ error: "Username already exists" });
-    
-    const newUser = new User({
-        username: cleanUsername, password: String(password).trim(),
-        device_id: device_id ? String(device_id).trim() : "",
-        credits: credits !== undefined ? Number(credits) : 2, plan: plan || "Trial",
-        is_pro: String(is_pro) === "true", account_status: account_status || "Active"
-    });
-    
-    await newUser.save();
-    res.json({ success: true, message: "User created successfully!", user: newUser });
+    try {
+        await connectToDatabase();
+        const { username, password, credits, plan, is_pro, account_status, device_id } = req.body || {};
+        if (!username || !password) return res.status(400).json({ error: "Username and password required" });
+        
+        const cleanUsername = String(username).trim().toLowerCase();
+        const existingUser = await User.findOne({ username: cleanUsername });
+        if (existingUser) return res.status(400).json({ error: "Username already exists" });
+        
+        const newUser = new User({
+            username: cleanUsername, password: String(password).trim(),
+            device_id: device_id ? String(device_id).trim() : "",
+            credits: credits !== undefined ? Number(credits) : 2, plan: plan || "Trial",
+            is_pro: String(is_pro) === "true", account_status: account_status || "Active"
+        });
+        
+        await newUser.save();
+        res.json({ success: true, message: "User created successfully!", user: newUser });
+    } catch (e) {
+        res.status(500).json({error: e.message});
+    }
 });
 
 // Start Server
