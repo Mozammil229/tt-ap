@@ -18,27 +18,19 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 1. MONGODB CONNECTION (Vercel Fix)
+// 1. MONGODB CONNECTION
 // ==========================================
 const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://pukathub_db_user:AWiAL8UUwrOQ6h33@cluster0.y2lzfvn.mongodb.net/MyUsersDB?retryWrites=true&w=majority";
 
 // Vercel cache connection fix
 let cached = global.mongoose;
-
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
-
 async function connectToDatabase() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
+  if (cached.conn) return cached.conn;
   if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
+    const opts = { bufferCommands: false };
     cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
       console.log("✅ Successfully Connected to MongoDB!");
       return mongoose;
@@ -51,9 +43,8 @@ async function connectToDatabase() {
   return cached.conn;
 }
 
-
 // ==========================================
-// 2. USER DATABASE SCHEMA (Design)
+// 2. USER DATABASE SCHEMA
 // ==========================================
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true, lowercase: true },
@@ -67,7 +58,6 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
-
 // ==========================================
 // 3. API ROUTES
 // ==========================================
@@ -79,31 +69,23 @@ function getRequestData(req) {
 // REGISTER USER
 app.all('/api/auth/register', async (req, res) => {
     try {
-        await connectToDatabase(); // Ensure DB is connected before query
+        await connectToDatabase();
         const data = getRequestData(req);
         const username = data.username ? String(data.username).trim().toLowerCase() : '';
         const password = data.password ? String(data.password).trim() : '';
         const device_id = data.device_id ? String(data.device_id).trim() : '';
 
-        if (!username || !password || !device_id) {
-            return res.status(400).json({ error: "Required fields missing" });
-        }
+        if (!username || !password || !device_id) return res.status(400).json({ error: "Required fields missing" });
 
         const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ error: "Username already exists." });
-        }
+        if (existingUser) return res.status(400).json({ error: "Username already exists." });
 
         const existingDeviceUser = await User.findOne({ device_id });
         if (existingDeviceUser && device_id !== "") {
             return res.status(400).json({ error: `Only 1 account allowed per device!` });
         }
 
-        const newUser = new User({
-            username, password, device_id,
-            credits: 2, plan: "Trial", is_pro: false, account_status: "Active"
-        });
-
+        const newUser = new User({ username, password, device_id, credits: 2, plan: "Trial", is_pro: false, account_status: "Active" });
         await newUser.save();
         
         const userObj = newUser.toObject();
@@ -123,12 +105,9 @@ app.all('/api/auth/login', async (req, res) => {
         const password = data.password ? String(data.password).trim() : '';
         const device_id = data.device_id ? String(data.device_id).trim() : '';
 
-        if (!username || !password || !device_id) {
-            return res.status(400).json({ error: "Required fields missing" });
-        }
+        if (!username || !password || !device_id) return res.status(400).json({ error: "Required fields missing" });
 
         const user = await User.findOne({ username });
-
         if (!user) return res.status(404).json({ error: "User not found" });
         if (user.password !== password) return res.status(401).json({ error: "Incorrect password" });
         if (user.account_status === "Blocked") return res.status(403).json({ error: "Account is Blocked by Admin." });
@@ -172,7 +151,9 @@ app.all('/api/deduct', async (req, res) => {
     }
 });
 
-// ADMIN PANEL APIS
+// ==========================================
+// 4. ADMIN PANEL APIS
+// ==========================================
 const ADMIN_PASSWORD = "admin";
 function requireAdminAuth(req, res, next) {
     const pass = req.headers['x-admin-password'] || req.query.admin_pass;
@@ -180,6 +161,7 @@ function requireAdminAuth(req, res, next) {
     else res.status(401).json({ error: "Unauthorized. Incorrect Admin Password." });
 }
 
+// GET ALL USERS
 app.get('/api/admin/users', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
@@ -192,6 +174,7 @@ app.get('/api/admin/users', requireAdminAuth, async (req, res) => {
     }
 });
 
+// CREATE NEW USER
 app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
@@ -216,7 +199,54 @@ app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
     }
 });
 
-// Start Server
+// UPDATE EXISTING USER (Credits, Block/Unblock, Password, etc)
+app.post('/api/admin/update', requireAdminAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { username, credits, plan, is_pro, account_status, device_id, password } = req.body || {};
+        
+        if (!username) return res.status(400).json({ error: "Username is required" });
+        
+        const cleanUsername = String(username).trim().toLowerCase();
+        const user = await User.findOne({ username: cleanUsername });
+        
+        if (!user) return res.status(404).json({ error: "User not found" });
+        
+        if (credits !== undefined) user.credits = Number(credits);
+        if (plan !== undefined) user.plan = plan;
+        if (is_pro !== undefined) user.is_pro = String(is_pro) === "true" || is_pro === true;
+        if (account_status !== undefined) user.account_status = account_status;
+        if (device_id !== undefined) user.device_id = String(device_id).trim();
+        
+        // Agar admin ne new password likha hai toh usay bhi change kar do
+        if (password !== undefined && password.trim() !== "") {
+            user.password = String(password).trim();
+        }
+        
+        await user.save();
+        res.json({ success: true, message: "User updated successfully!", user });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE USER
+app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const { username } = req.body || {};
+        if (!username) return res.status(400).json({ error: "Username is required" });
+        
+        const cleanUsername = String(username).trim().toLowerCase();
+        await User.deleteOne({ username: cleanUsername });
+        
+        res.json({ success: true, message: "User deleted successfully!" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Start Server (For Local Testing)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
