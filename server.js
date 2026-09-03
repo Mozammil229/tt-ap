@@ -10,27 +10,13 @@ app.use(cors());
 // Handle CORS Preflight for Vercel
 app.options('*', cors());
 
-// Safety Body Parser for Vercel Serverless
-app.use((req, res, next) => {
-    if (typeof req.body === 'string') {
-        try {
-            req.body = JSON.parse(req.body);
-        } catch (e) {
-            console.log("Body parse error:", e.message);
-        }
-    }
-    next();
-});
-
 // Serve Admin Panel Static Folder
 app.use(express.static(path.join(__dirname, 'publicm')));
 
-// Root route directly opens Admin Panel
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'publicm', 'admin.html'));
 });
 
-// Vercel /tmp directory for file storage (Read/Write Allowed)
 const DB_FILE = '/tmp/db.json';
 let memoryDB = { users: {} };
 
@@ -59,27 +45,21 @@ function findUser(db, username) {
     return key ? db.users[key] : null;
 }
 
-const ADMIN_PASSWORD = "admin";
-
-function requireAdminAuth(req, res, next) {
-    const pass = req.headers['x-admin-password'];
-    if (pass === ADMIN_PASSWORD) {
-        next();
-    } else {
-        res.status(401).json({ error: "Unauthorized. Incorrect Admin Password." });
-    }
+// Extract data from URL Query (GET) or JSON Body (POST)
+function getRequestData(req) {
+    return { ...req.query, ...req.body };
 }
 
-// 1. REGISTER USER (1 Device = 1 Account)
-app.post('/api/auth/register', async (req, res) => {
+// 1. REGISTER USER (Supports both GET & POST)
+app.all('/api/auth/register', async (req, res) => {
     try {
-        const body = req.body || {};
-        const username = body.username ? String(body.username).trim() : '';
-        const password = body.password ? String(body.password).trim() : '';
-        const device_id = body.device_id ? String(body.device_id).trim() : '';
+        const data = getRequestData(req);
+        const username = data.username ? String(data.username).trim() : '';
+        const password = data.password ? String(data.password).trim() : '';
+        const device_id = data.device_id ? String(data.device_id).trim() : '';
 
         if (!username || !password || !device_id) {
-            return res.status(400).json({ error: "Required fields missing" });
+            return res.status(400).json({ error: "Required fields missing in URL" });
         }
 
         const db = await readDB();
@@ -87,10 +67,9 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: "Username already exists." });
         }
 
-        // Check 1 Account Per Device
         const existingDeviceUser = Object.values(db.users).find(u => u.device_id === device_id);
         if (existingDeviceUser) {
-            return res.status(400).json({ error: `Only 1 account allowed per device! Registered to: ${existingDeviceUser.username}` });
+            return res.status(400).json({ error: `Only 1 account allowed per device!` });
         }
 
         const newUser = {
@@ -108,16 +87,16 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-// 2. LOGIN USER (Permanent Device Lock)
-app.post('/api/auth/login', async (req, res) => {
+// 2. LOGIN USER (Supports both GET & POST)
+app.all('/api/auth/login', async (req, res) => {
     try {
-        const body = req.body || {};
-        const username = body.username ? String(body.username).trim() : '';
-        const password = body.password ? String(body.password).trim() : '';
-        const device_id = body.device_id ? String(body.device_id).trim() : '';
+        const data = getRequestData(req);
+        const username = data.username ? String(data.username).trim() : '';
+        const password = data.password ? String(data.password).trim() : '';
+        const device_id = data.device_id ? String(data.device_id).trim() : '';
 
         if (!username || !password || !device_id) {
-            return res.status(400).json({ error: "Required fields missing" });
+            return res.status(400).json({ error: "Required fields missing in URL" });
         }
 
         const db = await readDB();
@@ -127,7 +106,6 @@ app.post('/api/auth/login', async (req, res) => {
         if (user.password !== password) return res.status(401).json({ error: "Incorrect password" });
         if (user.account_status === "Blocked") return res.status(403).json({ error: "Account is Blocked by Admin." });
 
-        // Bind permanently to first logging phone
         if (!user.device_id || user.device_id === "") {
             user.device_id = device_id;
             await writeDB(db);
@@ -142,10 +120,11 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// 3. DEDUCT CREDIT
-app.post('/api/deduct', async (req, res) => {
+// 3. DEDUCT CREDIT (Supports both GET & POST)
+app.all('/api/deduct', async (req, res) => {
     try {
-        const { username } = req.body || {};
+        const data = getRequestData(req);
+        const username = data.username ? String(data.username).trim() : '';
         const db = await readDB();
         const user = findUser(db, username);
 
@@ -166,65 +145,37 @@ app.post('/api/deduct', async (req, res) => {
 });
 
 // ADMIN PANEL APIS
+const ADMIN_PASSWORD = "admin";
+function requireAdminAuth(req, res, next) {
+    const pass = req.headers['x-admin-password'] || req.query.admin_pass;
+    if (pass === ADMIN_PASSWORD) next();
+    else res.status(401).json({ error: "Unauthorized. Incorrect Admin Password." });
+}
+
 app.get('/api/admin/users', requireAdminAuth, async (req, res) => {
     const db = await readDB();
     res.json(db.users);
 });
-
 app.post('/api/admin/create', requireAdminAuth, async (req, res) => {
+    // Keep Admin creations as POST
     const { username, password, credits, plan, is_pro, account_status, device_id } = req.body || {};
     if (!username || !password) return res.status(400).json({ error: "Username and password required" });
-
     const db = await readDB();
     if (findUser(db, username)) return res.status(400).json({ error: "Username already exists" });
-
     const newUser = {
-        username: String(username).trim(),
-        password: String(password).trim(),
+        username: String(username).trim(), password: String(password).trim(),
         device_id: device_id ? String(device_id).trim() : "",
-        credits: credits !== undefined ? Number(credits) : 2,
-        plan: plan || "Trial",
-        is_pro: String(is_pro) === "true",
-        account_status: account_status || "Active",
+        credits: credits !== undefined ? Number(credits) : 2, plan: plan || "Trial",
+        is_pro: String(is_pro) === "true", account_status: account_status || "Active",
         created_at: new Date().toISOString()
     };
-
     db.users[newUser.username] = newUser;
     await writeDB(db);
     res.json({ success: true, message: "User created successfully!", user: newUser });
-});
-
-app.post('/api/admin/update', requireAdminAuth, async (req, res) => {
-    const { username, password, credits, plan, is_pro, account_status, device_id } = req.body || {};
-    const db = await readDB();
-    const user = findUser(db, username);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (password) user.password = String(password).trim();
-    if (credits !== undefined) user.credits = Number(credits);
-    if (plan !== undefined) user.plan = plan;
-    if (is_pro !== undefined) user.is_pro = String(is_pro) === "true"; 
-    if (account_status !== undefined) user.account_status = account_status;
-    if (device_id !== undefined) user.device_id = String(device_id).trim();
-    
-    await writeDB(db);
-    res.json({ success: true });
-});
-
-app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
-    const { username } = req.body || {};
-    const db = await readDB();
-    const user = findUser(db, username);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    delete db.users[user.username];
-    await writeDB(db);
-    res.json({ success: true, message: `User ${user.username} deleted` });
 });
 
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 }
-
 module.exports = app;
