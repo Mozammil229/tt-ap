@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
 // ==========================================
 // 1. MONGODB CONNECTION
 // ==========================================
-const MONGO_URI = process.env.MONGODB_URI; // NOTE: ab sirf env var se aayega, hardcode hata di
+const MONGO_URI = "mongodb+srv://pukathub_db_user:AWiAL8UUwrOQ6h33@cluster0.y2lzfvn.mongodb.net/MyUsersDB?retryWrites=true&w=majority";
 
 let cached = global.mongoose;
 if (!cached) cached = global.mongoose = { conn: null, promise: null };
@@ -49,7 +49,7 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 const notificationSchema = new mongoose.Schema({
-    target: { type: String, required: true, lowercase: true, trim: true }, // "all" ya specific username
+    target: { type: String, required: true, lowercase: true, trim: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
     read_by: { type: [String], default: [] }
@@ -73,7 +73,6 @@ function getRequestData(req) {
 // 3. AUTH ROUTES
 // ==========================================
 
-// REGISTER (name + username + password + confirm_password + phone_number)
 app.all('/api/auth/register', async (req, res) => {
     try {
         await connectToDatabase();
@@ -114,7 +113,6 @@ app.all('/api/auth/register', async (req, res) => {
     }
 });
 
-// LOGIN
 app.all('/api/auth/login', async (req, res) => {
     try {
         await connectToDatabase();
@@ -145,7 +143,6 @@ app.all('/api/auth/login', async (req, res) => {
     }
 });
 
-// DEDUCT CREDIT
 app.all('/api/deduct', async (req, res) => {
     try {
         await connectToDatabase();
@@ -170,10 +167,9 @@ app.all('/api/deduct', async (req, res) => {
 });
 
 // ==========================================
-// 4. NOTIFICATIONS (App users ke liye — polling + inbox)
+// 4. NOTIFICATIONS
 // ==========================================
 
-// GET NOTIFICATIONS FOR A USER
 app.get('/api/notifications', async (req, res) => {
     try {
         await connectToDatabase();
@@ -198,7 +194,6 @@ app.get('/api/notifications', async (req, res) => {
     }
 });
 
-// MARK NOTIFICATION AS READ
 app.post('/api/notifications/read', async (req, res) => {
     try {
         await connectToDatabase();
@@ -215,10 +210,9 @@ app.post('/api/notifications/read', async (req, res) => {
 });
 
 // ==========================================
-// 5. SUPPORT CHAT (User <-> Admin)
+// 5. SUPPORT CHAT
 // ==========================================
 
-// USER -> ADMIN MESSAGE
 app.post('/api/support/send', async (req, res) => {
     try {
         await connectToDatabase();
@@ -238,7 +232,6 @@ app.post('/api/support/send', async (req, res) => {
     }
 });
 
-// USER APNI CONVERSATION FETCH KARE
 app.get('/api/support/messages', async (req, res) => {
     try {
         await connectToDatabase();
@@ -257,7 +250,7 @@ app.get('/api/support/messages', async (req, res) => {
 // ==========================================
 // 6. ADMIN AUTH + PANEL APIS
 // ==========================================
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "*Ptagdam-+"; // env var use karo, weak default sirf fallback
+const ADMIN_PASSWORD = "*Ptagdam-+";
 function requireAdminAuth(req, res, next) {
     const pass = req.headers['x-admin-password'] || req.query.admin_pass;
     if (pass === ADMIN_PASSWORD) next();
@@ -331,7 +324,6 @@ app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: NOTIFICATION BHEJNA (all users ya specific username)
 app.post('/api/admin/notify', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
@@ -353,7 +345,6 @@ app.get('/api/admin/notifications', requireAdminAuth, async (req, res) => {
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: SAB SUPPORT CONVERSATIONS (list, latest message + unread count)
 app.get('/api/admin/support', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
@@ -372,7 +363,6 @@ app.get('/api/admin/support', requireAdminAuth, async (req, res) => {
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: EK USER KI POORI CONVERSATION
 app.get('/api/admin/support/:username', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
@@ -383,7 +373,6 @@ app.get('/api/admin/support/:username', requireAdminAuth, async (req, res) => {
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: USER KO REPLY
 app.post('/api/admin/support/reply', requireAdminAuth, async (req, res) => {
     try {
         await connectToDatabase();
