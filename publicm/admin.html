@@ -1,360 +1,493 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vague Engine - Admin Panel</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
-        .container { max-width: 1050px; margin: auto; }
-        h1 { text-align: center; color: #00FF87; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #888; margin-bottom: 25px; font-size: 14px; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-bottom: 20px; }
-        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
-        th { color: #00FF87; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
-        button { background: #00FF87; color: #000; border: none; padding: 8px 14px; cursor: pointer; border-radius: 6px; font-weight: bold; font-size: 13px; transition: 0.2s; }
-        button:hover { background: #00cc6a; }
-        button.secondary { background: #333; color: #fff; }
-        button.secondary:hover { background: #444; }
-        button.danger { background: #ff4d4d; color: white; }
-        button.danger:hover { background: #cc0000; }
-        button.warning { background: #ffaa00; color: black; }
-        button.warning:hover { background: #e09500; }
-        input, select { padding: 10px; margin: 6px 0 12px 0; width: 100%; box-sizing: border-box; background: #2a2a2a; color: white; border: 1px solid #444; border-radius: 6px; font-size: 14px; }
-        input:focus, select:focus { border-color: #00FF87; outline: none; }
-        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
-        #dashboard { display: none; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 999; }
-        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 12px; width: 420px; box-shadow: 0 5px 20px rgba(0,0,0,0.8); border: 1px solid #333; }
-        .modal-content h3 { margin-top: 0; color: #00FF87; }
-        .close { float: right; cursor: pointer; font-size: 22px; color: #aaa; }
-        .close:hover { color: white; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-        .badge-active { background: rgba(0,255,135,0.15); color: #00FF87; border: 1px solid #00FF87; }
-        .badge-blocked { background: rgba(255,77,77,0.15); color: #ff4d4d; border: 1px solid #ff4d4d; }
-        .badge-pro { background: rgba(255,215,0,0.15); color: #FFD700; border: 1px solid #FFD700; }
-        .badge-unbound { background: rgba(136,136,136,0.2); color: #aaa; border: 1px solid #666; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Vague Engine - Admin</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#0d0d0d; color:#fff; margin:0; padding:0; }
+  .app { max-width: 480px; margin: auto; min-height: 100vh; background:#121212; display:flex; flex-direction:column; position:relative; }
+
+  /* LOGIN */
+  #login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; }
+  .login-card { width:100%; max-width:320px; text-align:center; }
+  .login-card h2 { color:#00FF87; margin-bottom:4px; }
+  .login-card p { color:#888; font-size:13px; margin-bottom:22px; }
+
+  /* TOP BAR */
+  .topbar { position:sticky; top:0; background:#171717; padding:16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #262626; z-index:5; }
+  .topbar h2 { margin:0; font-size:18px; color:#00FF87; }
+  .topbar .icon-btn { background:none; border:none; color:#aaa; font-size:20px; cursor:pointer; padding:4px 8px; }
+
+  /* SCREENS */
+  .screen { display:none; flex:1; overflow-y:auto; padding-bottom:80px; }
+  .screen.active { display:block; }
+
+  /* GENERIC */
+  input, select, textarea { width:100%; padding:12px; margin:6px 0 14px 0; background:#1e1e1e; color:#fff; border:1px solid #333; border-radius:10px; font-size:14px; }
+  input:focus, select:focus, textarea:focus { border-color:#00FF87; outline:none; }
+  label { font-size:12px; color:#999; text-transform:uppercase; letter-spacing:0.4px; }
+  button { border:none; cursor:pointer; border-radius:10px; font-weight:600; font-size:14px; transition:0.15s; }
+  .btn-primary { background:#00FF87; color:#000; padding:13px; width:100%; }
+  .btn-primary:active { background:#00cc6a; }
+  .btn-secondary { background:#262626; color:#fff; padding:10px 14px; }
+  .btn-danger { background:#ff4d4d1a; color:#ff4d4d; border:1px solid #ff4d4d; padding:8px 12px; font-size:12px; }
+  .btn-warning { background:#ffaa001a; color:#ffaa00; border:1px solid #ffaa00; padding:8px 12px; font-size:12px; }
+  .btn-mini { background:#00ff871a; color:#00FF87; border:1px solid #00FF87; padding:8px 12px; font-size:12px; }
+
+  /* USER CARDS */
+  .list-pad { padding:14px; }
+  .user-card { background:#1a1a1a; border:1px solid #262626; border-radius:14px; padding:14px; margin-bottom:12px; }
+  .user-card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .user-card-top .uname { font-weight:700; font-size:15px; }
+  .user-card-top .uphone { font-size:12px; color:#888; margin-top:2px; }
+  .badge { padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+  .badge-active { background:#00ff8726; color:#00FF87; }
+  .badge-blocked { background:#ff4d4d26; color:#ff4d4d; }
+  .badge-pro { background:#ffd70026; color:#FFD700; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .meta-line { font-size:12px; color:#aaa; margin:2px 0; }
+  .fab { position:fixed; bottom:90px; right:20px; max-width:480px; width:52px; height:52px; border-radius:50%; background:#00FF87; color:#000; font-size:26px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,255,135,0.4); z-index:10; }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:#171717; border-top:1px solid #262626; display:flex; z-index:20; }
+  .nav-btn { flex:1; text-align:center; padding:10px 0 8px 0; background:none; border:none; color:#777; font-size:11px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .nav-btn .ic { font-size:20px; }
+  .nav-btn.active { color:#00FF87; }
+  .nav-badge { background:#ff4d4d; color:#fff; font-size:10px; padding:1px 5px; border-radius:8px; position:relative; top:-14px; left:10px; }
+
+  /* MODAL */
+  .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); align-items:flex-end; justify-content:center; z-index:999; }
+  .modal.show { display:flex; }
+  .sheet { background:#1a1a1a; width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:20px; max-height:85vh; overflow-y:auto; }
+  .sheet-handle { width:36px; height:4px; background:#444; border-radius:4px; margin:0 auto 16px auto; }
+  .sheet h3 { color:#00FF87; margin-top:0; }
+  .close { float:right; font-size:22px; color:#888; cursor:pointer; }
+
+  /* NOTIFY SCREEN */
+  .notif-item { background:#1a1a1a; border-radius:12px; padding:12px 14px; margin-bottom:10px; border-left:3px solid #00FF87; }
+  .notif-item .t { font-weight:700; font-size:14px; }
+  .notif-item .m { color:#bbb; font-size:13px; margin-top:4px; }
+  .notif-item .tgt { color:#666; font-size:11px; margin-top:6px; }
+
+  /* SUPPORT LIST */
+  .conv-card { display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; padding:14px; border-radius:12px; margin-bottom:10px; cursor:pointer; }
+  .conv-card .cname { font-weight:700; font-size:14px; }
+  .conv-card .clast { color:#888; font-size:12px; margin-top:3px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .unread-dot { background:#ff4d4d; color:#fff; font-size:11px; border-radius:20px; padding:2px 7px; }
+
+  /* CHAT VIEW */
+  #chatScreen { display:none; flex-direction:column; height:100vh; }
+  #chatScreen.show { display:flex; }
+  .chat-topbar { display:flex; align-items:center; gap:10px; padding:14px; background:#171717; border-bottom:1px solid #262626; }
+  .chat-messages { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .bubble { max-width:78%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.4; }
+  .bubble.admin { align-self:flex-end; background:#00FF87; color:#000; border-bottom-right-radius:4px; }
+  .bubble.user { align-self:flex-start; background:#2a2a2a; color:#fff; border-bottom-left-radius:4px; }
+  .chat-input-bar { display:flex; gap:8px; padding:12px; background:#171717; border-top:1px solid #262626; }
+  .chat-input-bar input { margin:0; flex:1; }
+  .chat-input-bar button { padding:0 18px; }
+
+  .empty { text-align:center; color:#666; padding:40px 20px; font-size:13px; }
+</style>
 </head>
 <body>
+<div class="app">
 
-<div class="container">
-    <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="card" style="width: 320px; text-align: center;">
-            <h2 style="color: #00FF87; margin-top: 0;">Admin Login</h2>
-            <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Vague Engine Control Center</p>
-            <input type="password" id="admin-pass" placeholder="Enter Admin Password">
-            <button onclick="login()" style="width: 100%; margin-top: 5px; padding: 12px;">Login to Dashboard</button>
-            <p id="login-error" style="color: #ff4d4d; display: none; margin-top: 15px; font-size: 13px;">Incorrect Password</p>
-        </div>
+  <!-- LOGIN -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h2>Vague Engine</h2>
+      <p>Admin Control Center</p>
+      <input type="password" id="admin-pass" placeholder="Admin Password">
+      <button class="btn-primary" onclick="login()">Login</button>
+      <p id="login-error" style="color:#ff4d4d; display:none; margin-top:14px; font-size:13px;">Incorrect Password</p>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none; flex:1; display:none; flex-direction:column;">
+    <div class="topbar">
+      <h2 id="screen-title">Users</h2>
+      <button class="icon-btn" onclick="logout()">⎋</button>
     </div>
 
-    <!-- Dashboard -->
-    <div id="dashboard">
-        <h1>Vague Engine PRO</h1>
-        <div class="subtitle">User & Device Lock Management Center</div>
-
-        <div class="card">
-            <div class="header-actions">
-                <h3 style="margin: 0; color: #00FF87;">User Accounts</h3>
-                <div>
-                    <button onclick="openCreateModal()">+ Add New User</button>
-                    <button onclick="logout()" class="secondary" style="margin-left: 8px;">Logout</button>
-                </div>
-            </div>
-            
-            <table id="users-table">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Device Lock ID</th>
-                        <th>Credits</th>
-                        <th>Plan</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+    <!-- USERS SCREEN -->
+    <div class="screen active" id="screen-users">
+      <div class="list-pad" id="users-list"></div>
     </div>
+
+    <!-- NOTIFY SCREEN -->
+    <div class="screen" id="screen-notify">
+      <div class="list-pad">
+        <button class="btn-primary" style="margin-bottom:16px;" onclick="openNotifyModal()">+ Send Notification</button>
+        <div id="notif-list"></div>
+      </div>
+    </div>
+
+    <!-- SUPPORT SCREEN -->
+    <div class="screen" id="screen-support">
+      <div class="list-pad" id="support-list"></div>
+    </div>
+
+    <button class="fab" id="add-user-fab" onclick="openCreateModal()">+</button>
+  </div>
+
+  <!-- CHAT DETAIL SCREEN -->
+  <div id="chatScreen">
+    <div class="chat-topbar">
+      <button class="icon-btn" onclick="closeChat()">←</button>
+      <h3 id="chat-username" style="margin:0; color:#00FF87;"></h3>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-bar">
+      <input type="text" id="chat-input" placeholder="Reply likhein...">
+      <button class="btn-primary" onclick="sendReply()">Send</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav" id="bottom-nav" style="display:none;">
+    <button class="nav-btn active" onclick="switchTab('users')"><span class="ic">👥</span>Users</button>
+    <button class="nav-btn" onclick="switchTab('notify')"><span class="ic">🔔</span>Notify</button>
+    <button class="nav-btn" onclick="switchTab('support')"><span class="ic">💬</span>Support<span class="nav-badge" id="support-badge" style="display:none;">0</span></button>
+  </div>
+
 </div>
 
-<!-- Add User Modal -->
-<div id="createModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeCreateModal()">&times;</span>
-        <h3>Create New User</h3>
-        
-        <label>Username</label>
-        <input type="text" id="create-username" placeholder="e.g. user123">
-        
-        <label>Password</label>
-        <input type="text" id="create-password" placeholder="e.g. pass123">
-        
-        <label>Initial Credits</label>
-        <input type="number" id="create-credits" value="2">
-        
-        <label>Plan</label>
-        <select id="create-plan">
-            <option value="Trial">Trial</option>
-            <option value="Monthly">Monthly</option>
-            <option value="Yearly">Yearly</option>
-            <option value="Lifetime">Lifetime</option>
-        </select>
-        
-        <label>Is PRO (Unlimited Credits)</label>
-        <select id="create-is-pro">
-            <option value="false">No (Uses Credits)</option>
-            <option value="true">Yes (Unlimited)</option>
-        </select>
-
-        <button onclick="createNewUser()" style="width: 100%; margin-top: 10px; padding: 12px;">Create Account</button>
-    </div>
+<!-- CREATE USER MODAL -->
+<div class="modal" id="createModal">
+  <div class="sheet">
+    <span class="close" onclick="closeModal('createModal')">&times;</span>
+    <div class="sheet-handle"></div>
+    <h3>Create New User</h3>
+    <label>Name</label><input type="text" id="create-name">
+    <label>Username</label><input type="text" id="create-username">
+    <label>Phone Number</label><input type="text" id="create-phone">
+    <label>Password</label><input type="text" id="create-password">
+    <label>Confirm Password</label><input type="text" id="create-password2">
+    <label>Initial Credits</label><input type="number" id="create-credits" value="2">
+    <label>Plan</label>
+    <select id="create-plan"><option>Trial</option><option>Monthly</option><option>Yearly</option><option>Lifetime</option></select>
+    <label>Is PRO</label>
+    <select id="create-is-pro"><option value="false">No</option><option value="true">Yes</option></select>
+    <button class="btn-primary" onclick="createNewUser()">Create Account</button>
+  </div>
 </div>
 
-<!-- Edit User Modal -->
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeEditModal()">&times;</span>
-        <h3 id="modal-title">Edit User</h3>
-        <input type="hidden" id="edit-username">
-        
-        <label>New Password (leave blank to keep same)</label>
-        <input type="text" id="edit-password" placeholder="Enter new password">
-
-        <label>Credits</label>
-        <input type="number" id="edit-credits">
-        
-        <label>Plan</label>
-        <select id="edit-plan">
-            <option value="Trial">Trial</option>
-            <option value="Monthly">Monthly</option>
-            <option value="Yearly">Yearly</option>
-            <option value="Lifetime">Lifetime</option>
-        </select>
-        
-        <label>Is PRO (Unlimited)</label>
-        <select id="edit-is-pro">
-            <option value="false">No</option>
-            <option value="true">Yes</option>
-        </select>
-
-        <label>Account Status</label>
-        <select id="edit-status">
-            <option value="Active">Active</option>
-            <option value="Blocked">Blocked</option>
-        </select>
-
-        <label>Device ID (Clear to unlock phone)</label>
-        <input type="text" id="edit-device-id" placeholder="Device ID string">
-
-        <div style="display: flex; gap: 8px; margin-top: 15px;">
-            <button onclick="saveUserChanges()" style="flex: 1; padding: 10px;">Save</button>
-            <button onclick="resetDeviceLock()" class="warning" style="flex: 1; padding: 10px;">Reset Device Lock</button>
-        </div>
+<!-- EDIT USER MODAL -->
+<div class="modal" id="editModal">
+  <div class="sheet">
+    <span class="close" onclick="closeModal('editModal')">&times;</span>
+    <div class="sheet-handle"></div>
+    <h3 id="modal-title">Edit User</h3>
+    <input type="hidden" id="edit-username">
+    <label>Name</label><input type="text" id="edit-name">
+    <label>Phone Number</label><input type="text" id="edit-phone">
+    <label>New Password (blank = same)</label><input type="text" id="edit-password">
+    <label>Credits</label><input type="number" id="edit-credits">
+    <label>Plan</label>
+    <select id="edit-plan"><option>Trial</option><option>Monthly</option><option>Yearly</option><option>Lifetime</option></select>
+    <label>Is PRO</label>
+    <select id="edit-is-pro"><option value="false">No</option><option value="true">Yes</option></select>
+    <label>Status</label>
+    <select id="edit-status"><option>Active</option><option>Blocked</option></select>
+    <label>Device ID (clear = unlock phone)</label><input type="text" id="edit-device-id">
+    <div class="row">
+      <button class="btn-primary" style="flex:1;" onclick="saveUserChanges()">Save</button>
+      <button class="btn-warning" style="flex:1;" onclick="resetDeviceLock()">Reset Device</button>
     </div>
+  </div>
+</div>
+
+<!-- NOTIFY MODAL -->
+<div class="modal" id="notifyModal">
+  <div class="sheet">
+    <span class="close" onclick="closeModal('notifyModal')">&times;</span>
+    <div class="sheet-handle"></div>
+    <h3>Send Notification</h3>
+    <label>Send To</label>
+    <select id="notify-target">
+      <option value="all">All Users (Broadcast)</option>
+      <option value="__specific__">Specific Username</option>
+    </select>
+    <input type="text" id="notify-username" placeholder="Username" style="display:none;">
+    <label>Title</label><input type="text" id="notify-title" placeholder="e.g. Naya Update">
+    <label>Message</label><textarea id="notify-message" rows="4" placeholder="Message likhein..."></textarea>
+    <button class="btn-primary" onclick="sendNotification()">Send</button>
+  </div>
 </div>
 
 <script>
-    let adminPassword = "";
+let adminPassword = "";
+let currentTab = "users";
+let currentChatUsername = "";
+let usersCache = {};
 
-    function login() {
-        adminPassword = document.getElementById('admin-pass').value;
-        fetchUsers();
-    }
+document.getElementById('notify-target').addEventListener('change', function() {
+    document.getElementById('notify-username').style.display = this.value === '__specific__' ? 'block' : 'none';
+});
 
-    function logout() {
-        adminPassword = "";
-        document.getElementById('dashboard').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('admin-pass').value = '';
-    }
+function login() {
+    adminPassword = document.getElementById('admin-pass').value;
+    fetchUsers();
+}
 
-    async function fetchUsers() {
-        try {
-            const response = await fetch('/api/admin/users', {
-                headers: { 'x-admin-password': adminPassword }
-            });
-            
-            if (response.ok) {
-                const users = await response.json();
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('login-error').style.display = 'none';
-                renderTable(users);
-            } else {
-                document.getElementById('login-error').style.display = 'block';
-            }
-        } catch (e) {
-            alert('Server connection error');
+function logout() {
+    adminPassword = "";
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('bottom-nav').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('admin-pass').value = '';
+}
+
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('screen-' + tab).classList.add('active');
+    event.currentTarget.classList.add('active');
+    document.getElementById('add-user-fab').style.display = tab === 'users' ? 'flex' : 'none';
+    document.getElementById('screen-title').innerText = tab.charAt(0).toUpperCase() + tab.slice(1);
+
+    if (tab === 'notify') fetchNotifications();
+    if (tab === 'support') fetchSupportList();
+}
+
+async function apiGet(url) {
+    const res = await fetch(url, { headers: { 'x-admin-password': adminPassword } });
+    return { ok: res.ok, data: await res.json() };
+}
+async function apiPost(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+        body: JSON.stringify(body)
+    });
+    return { ok: res.ok, data: await res.json() };
+}
+
+// ---------- USERS ----------
+async function fetchUsers() {
+    try {
+        const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': adminPassword } });
+        if (res.ok) {
+            usersCache = await res.json();
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            document.getElementById('bottom-nav').style.display = 'flex';
+            document.getElementById('login-error').style.display = 'none';
+            renderUsers(usersCache);
+            fetchSupportList(true);
+        } else {
+            document.getElementById('login-error').style.display = 'block';
         }
+    } catch (e) { alert('Server connection error'); }
+}
+
+function renderUsers(users) {
+    const wrap = document.getElementById('users-list');
+    wrap.innerHTML = '';
+    const keys = Object.keys(users);
+    if (keys.length === 0) { wrap.innerHTML = '<div class="empty">Abhi koi user register nahi hua.</div>'; return; }
+
+    keys.forEach(username => {
+        const u = users[username];
+        const statusBadge = u.account_status === 'Blocked' ? '<span class="badge badge-blocked">BLOCKED</span>' : '<span class="badge badge-active">ACTIVE</span>';
+        const proBadge = u.is_pro ? '<span class="badge badge-pro">PRO</span>' : '';
+        const div = document.createElement('div');
+        div.className = 'user-card';
+        div.innerHTML = `
+            <div class="user-card-top">
+                <div>
+                    <div class="uname">${u.name ? u.name : u.username} <span style="color:#666; font-weight:400;">@${u.username}</span></div>
+                    <div class="uphone">${u.phone_number || 'no phone'}</div>
+                </div>
+                <div style="display:flex; gap:5px;">${proBadge}${statusBadge}</div>
+            </div>
+            <div class="meta-line">Credits: ${u.is_pro ? 'Infinity ∞' : u.credits} · Plan: ${u.plan}</div>
+            <div class="meta-line">Device: ${u.device_id ? u.device_id.slice(0,18)+'…' : 'Unbound'}</div>
+            <div class="row">
+                <button class="btn-mini" onclick='openEditModal(${JSON.stringify(u)})'>Edit</button>
+                ${u.account_status === 'Active'
+                    ? `<button class="btn-warning" onclick="toggleBlock('${u.username}','Blocked')">Block</button>`
+                    : `<button class="btn-mini" onclick="toggleBlock('${u.username}','Active')">Unblock</button>`}
+                <button class="btn-danger" onclick="deleteUser('${u.username}')">Delete</button>
+            </div>
+        `;
+        wrap.appendChild(div);
+    });
+}
+
+function openCreateModal() { document.getElementById('createModal').classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function createNewUser() {
+    const name = document.getElementById('create-name').value.trim();
+    const username = document.getElementById('create-username').value.trim();
+    const phone_number = document.getElementById('create-phone').value.trim();
+    const password = document.getElementById('create-password').value.trim();
+    const password2 = document.getElementById('create-password2').value.trim();
+    const credits = parseInt(document.getElementById('create-credits').value);
+    const plan = document.getElementById('create-plan').value;
+    const is_pro = document.getElementById('create-is-pro').value === 'true';
+
+    if (!username || !password) return alert('Username aur Password zaroori hain!');
+    if (password !== password2) return alert('Password match nahi ho rahe!');
+
+    const { ok, data } = await apiPost('/api/admin/create', { name, username, password, credits, plan, is_pro, account_status: 'Active', phone_number });
+    if (ok) { alert('User create ho gaya!'); closeModal('createModal'); fetchUsers(); }
+    else alert(data.error || 'Failed');
+}
+
+function openEditModal(u) {
+    document.getElementById('edit-username').value = u.username;
+    document.getElementById('modal-title').innerText = "Edit: " + u.username;
+    document.getElementById('edit-name').value = u.name || '';
+    document.getElementById('edit-phone').value = u.phone_number || '';
+    document.getElementById('edit-password').value = '';
+    document.getElementById('edit-credits').value = u.credits;
+    document.getElementById('edit-plan').value = u.plan;
+    document.getElementById('edit-is-pro').value = String(u.is_pro);
+    document.getElementById('edit-status').value = u.account_status;
+    document.getElementById('edit-device-id').value = u.device_id || '';
+    document.getElementById('editModal').classList.add('show');
+}
+
+async function saveUserChanges() {
+    const username = document.getElementById('edit-username').value;
+    const payload = {
+        username,
+        name: document.getElementById('edit-name').value.trim(),
+        phone_number: document.getElementById('edit-phone').value.trim(),
+        credits: parseInt(document.getElementById('edit-credits').value),
+        plan: document.getElementById('edit-plan').value,
+        is_pro: document.getElementById('edit-is-pro').value === 'true',
+        account_status: document.getElementById('edit-status').value,
+        device_id: document.getElementById('edit-device-id').value.trim()
+    };
+    const password = document.getElementById('edit-password').value.trim();
+    if (password) payload.password = password;
+
+    const { ok, data } = await apiPost('/api/admin/update', payload);
+    if (ok) { closeModal('editModal'); fetchUsers(); } else alert(data.error || 'Failed');
+}
+
+async function resetDeviceLock() {
+    if (confirm('Device lock reset karein?')) {
+        document.getElementById('edit-device-id').value = '';
+        await saveUserChanges();
     }
+}
 
-    function renderTable(users) {
-        const tbody = document.querySelector('#users-table tbody');
-        tbody.innerHTML = '';
-        
-        if (Object.keys(users).length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #888; padding: 20px;">No users registered yet.</td></tr>`;
-            return;
-        }
-
-        for (const username in users) {
-            const user = users[username];
-            const row = document.createElement('tr');
-            
-            const deviceDisplay = user.device_id 
-                ? `<small style="color:#aaa;">${user.device_id}</small>` 
-                : `<span class="badge badge-unbound">Unbound (1st phone will bind)</span>`;
-
-            const statusBadge = user.account_status === 'Blocked' 
-                ? `<span class="badge badge-blocked">BLOCKED</span>` 
-                : `<span class="badge badge-active">ACTIVE</span>`;
-
-            const planBadge = user.is_pro
-                ? `<span class="badge badge-pro">PRO (${user.plan})</span>`
-                : user.plan;
-
-            row.innerHTML = `
-                <td><strong>${user.username}</strong></td>
-                <td>${deviceDisplay}</td>
-                <td>${user.is_pro ? 'Infinity ∞' : user.credits}</td>
-                <td>${planBadge}</td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button onclick="openEditModal('${user.username}', ${user.credits}, '${user.plan}', ${user.is_pro}, '${user.account_status}', '${user.device_id || ''}')">Edit</button>
-                    ${user.account_status === 'Active' 
-                        ? `<button class="warning" onclick="toggleBlock('${user.username}', 'Blocked')">Block</button>`
-                        : `<button class="secondary" onclick="toggleBlock('${user.username}', 'Active')">Unblock</button>`
-                    }
-                    <button class="danger" onclick="deleteUser('${user.username}')">Delete</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        }
+async function toggleBlock(username, status) {
+    if (confirm(`${username} ko ${status} karein?`)) {
+        const { ok, data } = await apiPost('/api/admin/update', { username, account_status: status });
+        if (ok) fetchUsers(); else alert(data.error || 'Failed');
     }
+}
 
-    function openCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
-    function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; }
-
-    async function createNewUser() {
-        const username = document.getElementById('create-username').value.trim();
-        const password = document.getElementById('create-password').value.trim();
-        const credits = parseInt(document.getElementById('create-credits').value);
-        const plan = document.getElementById('create-plan').value;
-        const is_pro = document.getElementById('create-is-pro').value === 'true';
-
-        if (!username || !password) {
-            alert('Username and password are required!');
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/admin/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-                body: JSON.stringify({ username, password, credits, plan, is_pro, account_status: 'Active' })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert('User created successfully!');
-                closeCreateModal();
-                fetchUsers();
-            } else {
-                alert(data.error || 'Failed to create user');
-            }
-        } catch (e) {
-            alert('Error creating user');
-        }
+async function deleteUser(username) {
+    if (confirm(`${username} ko permanently DELETE karein?`)) {
+        const { ok, data } = await apiPost('/api/admin/delete', { username });
+        if (ok) fetchUsers(); else alert(data.error || 'Delete failed');
     }
+}
 
-    function openEditModal(username, credits, plan, isPro, status, deviceId) {
-        document.getElementById('edit-username').value = username;
-        document.getElementById('modal-title').innerText = "Edit User: " + username;
-        document.getElementById('edit-password').value = "";
-        document.getElementById('edit-credits').value = credits;
-        document.getElementById('edit-plan').value = plan;
-        document.getElementById('edit-is-pro').value = isPro;
-        document.getElementById('edit-status').value = status;
-        document.getElementById('edit-device-id').value = deviceId;
-        document.getElementById('editModal').style.display = 'flex';
-    }
+// ---------- NOTIFICATIONS ----------
+function openNotifyModal() {
+    document.getElementById('notify-title').value = '';
+    document.getElementById('notify-message').value = '';
+    document.getElementById('notify-username').value = '';
+    document.getElementById('notify-target').value = 'all';
+    document.getElementById('notify-username').style.display = 'none';
+    document.getElementById('notifyModal').classList.add('show');
+}
 
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+async function sendNotification() {
+    const targetSel = document.getElementById('notify-target').value;
+    const target = targetSel === '__specific__' ? document.getElementById('notify-username').value.trim().toLowerCase() : 'all';
+    const title = document.getElementById('notify-title').value.trim();
+    const message = document.getElementById('notify-message').value.trim();
+    if (!title || !message) return alert('Title aur Message likhein');
+    if (targetSel === '__specific__' && !target) return alert('Username likhein');
 
-    async function saveUserChanges() {
-        const username = document.getElementById('edit-username').value;
-        const password = document.getElementById('edit-password').value.trim();
-        const credits = parseInt(document.getElementById('edit-credits').value);
-        const plan = document.getElementById('edit-plan').value;
-        const is_pro = document.getElementById('edit-is-pro').value === 'true';
-        const account_status = document.getElementById('edit-status').value;
-        const device_id = document.getElementById('edit-device-id').value.trim();
+    const { ok, data } = await apiPost('/api/admin/notify', { target, title, message });
+    if (ok) { alert('Notification bhej di gayi!'); closeModal('notifyModal'); fetchNotifications(); }
+    else alert(data.error || 'Failed');
+}
 
-        const updateData = { username, credits, plan, is_pro, account_status, device_id };
-        if (password) updateData.password = password;
+async function fetchNotifications() {
+    const { ok, data } = await apiGet('/api/admin/notifications');
+    const wrap = document.getElementById('notif-list');
+    if (!ok) { wrap.innerHTML = '<div class="empty">Load nahi hui.</div>'; return; }
+    if (data.length === 0) { wrap.innerHTML = '<div class="empty">Koi notification bheji nahi gayi abhi.</div>'; return; }
+    wrap.innerHTML = data.map(n => `
+        <div class="notif-item">
+            <div class="t">${n.title}</div>
+            <div class="m">${n.message}</div>
+            <div class="tgt">To: ${n.target === 'all' ? 'All Users' : '@' + n.target} · ${new Date(n.created_at).toLocaleString()}</div>
+        </div>
+    `).join('');
+}
 
-        await updateApi(updateData);
-        closeEditModal();
-    }
+// ---------- SUPPORT CHAT ----------
+async function fetchSupportList(silent) {
+    const { ok, data } = await apiGet('/api/admin/support');
+    if (!ok) return;
+    const totalUnread = data.reduce((sum, c) => sum + c.unread_count, 0);
+    const badge = document.getElementById('support-badge');
+    if (totalUnread > 0) { badge.style.display = 'inline-block'; badge.innerText = totalUnread; }
+    else badge.style.display = 'none';
 
-    async function resetDeviceLock() {
-        const username = document.getElementById('edit-username').value;
-        if (confirm(`Reset device lock for ${username}? This will allow the user to log in on a new phone.`)) {
-            document.getElementById('edit-device-id').value = "";
-            await saveUserChanges();
-        }
-    }
+    if (silent) return;
+    const wrap = document.getElementById('support-list');
+    if (data.length === 0) { wrap.innerHTML = '<div class="empty">Koi support message nahi aaya abhi.</div>'; return; }
+    wrap.innerHTML = data.map(c => `
+        <div class="conv-card" onclick="openChat('${c._id}')">
+            <div>
+                <div class="cname">@${c._id}</div>
+                <div class="clast">${c.last_sender === 'admin' ? 'You: ' : ''}${(c.last_message || '').slice(0,40)}</div>
+            </div>
+            ${c.unread_count > 0 ? `<span class="unread-dot">${c.unread_count}</span>` : ''}
+        </div>
+    `).join('');
+}
 
-    async function toggleBlock(username, status) {
-        if(confirm(`Change status of ${username} to ${status}?`)){
-            await updateApi({ username, account_status: status });
-        }
-    }
+async function openChat(username) {
+    currentChatUsername = username;
+    document.getElementById('chat-username').innerText = '@' + username;
+    document.getElementById('chatScreen').classList.add('show');
+    await loadChatMessages();
+}
 
-    async function deleteUser(username) {
-        if(confirm(`ARE YOU SURE you want to DELETE ${username} permanently?`)){
-            try {
-                const res = await fetch('/api/admin/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-                    body: JSON.stringify({ username })
-                });
-                if (res.ok) {
-                    fetchUsers();
-                } else {
-                    alert('Delete failed');
-                }
-            } catch (e) {
-                alert('Error deleting user');
-            }
-        }
-    }
+function closeChat() {
+    document.getElementById('chatScreen').classList.remove('show');
+    fetchSupportList();
+}
 
-    async function updateApi(data) {
-        try {
-            const response = await fetch('/api/admin/update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-admin-password': adminPassword
-                },
-                body: JSON.stringify(data)
-            });
-            if (response.ok) {
-                fetchUsers();
-            } else {
-                const resData = await response.json();
-                alert(resData.error || 'Failed to update');
-            }
-        } catch (e) {
-            alert('Error updating user');
-        }
-    }
+async function loadChatMessages() {
+    const { ok, data } = await apiGet('/api/admin/support/' + currentChatUsername);
+    if (!ok) return;
+    const wrap = document.getElementById('chat-messages');
+    if (data.length === 0) { wrap.innerHTML = '<div class="empty">Koi message nahi hai abhi.</div>'; return; }
+    wrap.innerHTML = data.map(m => `<div class="bubble ${m.sender}">${m.message}</div>`).join('');
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendReply() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    const { ok, data } = await apiPost('/api/admin/support/reply', { username: currentChatUsername, message });
+    if (ok) loadChatMessages(); else alert(data.error || 'Failed');
+}
+
+document.getElementById('chat-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') sendReply();
+});
 </script>
 </body>
-              </html>
+</html>
