@@ -250,7 +250,7 @@ app.get('/api/support/messages', async (req, res) => {
 // ==========================================
 // 6. ADMIN AUTH + PANEL APIS
 // ==========================================
-const ADMIN_PASSWORD = "*Ptagdam-+";
+const ADMIN_PASSWORD = "Ptagdamai";
 function requireAdminAuth(req, res, next) {
     const pass = req.headers['x-admin-password'] || req.query.admin_pass;
     if (pass === ADMIN_PASSWORD) next();
