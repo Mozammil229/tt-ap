@@ -257,7 +257,7 @@ app.get('/api/support/messages', async (req, res) => {
 // ==========================================
 // 6. ADMIN AUTH + PANEL APIS
 // ==========================================
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin"; // env var use karo, weak default sirf fallback
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "*Ptagdam-+"; // env var use karo, weak default sirf fallback
 function requireAdminAuth(req, res, next) {
     const pass = req.headers['x-admin-password'] || req.query.admin_pass;
     if (pass === ADMIN_PASSWORD) next();
